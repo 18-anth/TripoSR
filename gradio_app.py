@@ -1,19 +1,17 @@
+import argparse
+
+from tsr.utils import remove_background, resize_foreground, to_gradio_3d_orientation
+from tsr.system import TSR
+from functools import partial
+from PIL import Image
+import torch
+import rembg
+import numpy as np
+import gradio as gr
 import logging
 import os
 import tempfile
 import time
-
-import gradio as gr
-import numpy as np
-import rembg
-import torch
-from PIL import Image
-from functools import partial
-
-from tsr.system import TSR
-from tsr.utils import remove_background, resize_foreground, to_gradio_3d_orientation
-
-import argparse
 
 
 if torch.cuda.is_available():
@@ -42,7 +40,8 @@ def check_input_image(input_image):
 def preprocess(input_image, do_remove_background, foreground_ratio):
     def fill_background(image):
         image = np.array(image).astype(np.float32) / 255.0
-        image = image[:, :, :3] * image[:, :, 3:4] + (1 - image[:, :, 3:4]) * 0.5
+        image = image[:, :, :3] * image[:, :, 3:4] + \
+            (1 - image[:, :, 3:4]) * 0.5
         image = Image.fromarray((image * 255.0).astype(np.uint8))
         return image
 
@@ -58,13 +57,17 @@ def preprocess(input_image, do_remove_background, foreground_ratio):
     return image
 
 
-def generate(image, mc_resolution, formats=["obj", "glb"]):
+def generate(image, mc_resolution, decimate_target, formats=["obj", "glb"]):
     scene_codes = model(image, device=device)
     mesh = model.extract_mesh(scene_codes, True, resolution=mc_resolution)[0]
     mesh = to_gradio_3d_orientation(mesh)
+    if decimate_target > 0 and len(mesh.faces) > decimate_target:
+        import trimesh
+        mesh = mesh.simplify_quadric_decimation(decimate_target)
     rv = []
     for format in formats:
-        mesh_path = tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False)
+        mesh_path = tempfile.NamedTemporaryFile(
+            suffix=f".{format}", delete=False)
         mesh.export(mesh_path.name)
         rv.append(mesh_path.name)
     return rv
@@ -72,7 +75,8 @@ def generate(image, mc_resolution, formats=["obj", "glb"]):
 
 def run_example(image_pil):
     preprocessed = preprocess(image_pil, False, 0.9)
-    mesh_name_obj, mesh_name_glb = generate(preprocessed, 256, ["obj", "glb"])
+    mesh_name_obj, mesh_name_glb = generate(
+        preprocessed, 320, 0, ["obj", "glb"])
     return preprocessed, mesh_name_obj, mesh_name_glb
 
 
@@ -98,7 +102,8 @@ with gr.Blocks(title="TripoSR") as interface:
                     type="pil",
                     elem_id="content_image",
                 )
-                processed_image = gr.Image(label="Processed Image", interactive=False)
+                processed_image = gr.Image(
+                    label="Processed Image", interactive=False)
             with gr.Row():
                 with gr.Group():
                     do_remove_background = gr.Checkbox(
@@ -114,25 +119,37 @@ with gr.Blocks(title="TripoSR") as interface:
                     mc_resolution = gr.Slider(
                         label="Marching Cubes Resolution",
                         minimum=32,
-                        maximum=320,
-                        value=256,
-                        step=32
+                        maximum=5000,
+                        value=320,
+                        step=32,
+                        info="Higher = more vertices/faces (5000 → ~hundreds of M faces, slower)"
+                    )
+                    decimate_target = gr.Slider(
+                        label="Decimate to N faces (0 = disabled)",
+                        minimum=0,
+                        maximum=2000000,
+                        value=0,
+                        step=50000,
+                        info="Reduce faces after generation to shrink file size"
                     )
             with gr.Row():
-                submit = gr.Button("Generate", elem_id="generate", variant="primary")
+                submit = gr.Button(
+                    "Generate", elem_id="generate", variant="primary")
         with gr.Column():
             with gr.Tab("OBJ"):
                 output_model_obj = gr.Model3D(
                     label="Output Model (OBJ Format)",
                     interactive=False,
                 )
-                gr.Markdown("Note: The model shown here is flipped. Download to get correct results.")
+                gr.Markdown(
+                    "Note: The model shown here is flipped. Download to get correct results.")
             with gr.Tab("GLB"):
                 output_model_glb = gr.Model3D(
                     label="Output Model (GLB Format)",
                     interactive=False,
                 )
-                gr.Markdown("Note: The model shown here has a darker appearance. Download to get correct results.")
+                gr.Markdown(
+                    "Note: The model shown here has a darker appearance. Download to get correct results.")
     with gr.Row(variant="panel"):
         gr.Examples(
             examples=[
@@ -163,25 +180,31 @@ with gr.Blocks(title="TripoSR") as interface:
         outputs=[processed_image],
     ).success(
         fn=generate,
-        inputs=[processed_image, mc_resolution],
+        inputs=[processed_image, mc_resolution, decimate_target],
         outputs=[output_model_obj, output_model_glb],
     )
 
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--username', type=str, default=None, help='Username for authentication')
-    parser.add_argument('--password', type=str, default=None, help='Password for authentication')
-    parser.add_argument('--port', type=int, default=7860, help='Port to run the server listener on')
-    parser.add_argument("--listen", action='store_true', help="launch gradio with 0.0.0.0 as server name, allowing to respond to network requests")
-    parser.add_argument("--share", action='store_true', help="use share=True for gradio and make the UI accessible through their site")
-    parser.add_argument("--queuesize", type=int, default=1, help="launch gradio queue max_size")
+    parser.add_argument('--username', type=str, default=None,
+                        help='Username for authentication')
+    parser.add_argument('--password', type=str, default=None,
+                        help='Password for authentication')
+    parser.add_argument('--port', type=int, default=7860,
+                        help='Port to run the server listener on')
+    parser.add_argument("--listen", action='store_true',
+                        help="launch gradio with 0.0.0.0 as server name, allowing to respond to network requests")
+    parser.add_argument("--share", action='store_true',
+                        help="use share=True for gradio and make the UI accessible through their site")
+    parser.add_argument("--queuesize", type=int, default=1,
+                        help="launch gradio queue max_size")
     args = parser.parse_args()
     interface.queue(max_size=args.queuesize)
     interface.launch(
-        auth=(args.username, args.password) if (args.username and args.password) else None,
+        auth=(args.username, args.password) if (
+            args.username and args.password) else None,
         share=args.share,
-        server_name="0.0.0.0" if args.listen else None, 
-        server_port=args.port
+        server_name="0.0.0.0",
+        server_port=args.port,
+        show_error=True,
     )

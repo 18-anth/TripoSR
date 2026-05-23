@@ -1,9 +1,15 @@
 from typing import Callable, Optional, Tuple
 
+import mcubes
 import numpy as np
 import torch
 import torch.nn as nn
-from torchmcubes import marching_cubes
+
+
+def marching_cubes(level: torch.FloatTensor, isovalue: float):
+    """Wrapper around PyMCubes to match torchmcubes interface."""
+    vertices, faces = mcubes.marching_cubes(-level.cpu().numpy(), isovalue)
+    return torch.from_numpy(vertices.astype(np.float32)), torch.from_numpy(faces.astype(np.int64))
 
 
 class IsosurfaceHelper(nn.Module):
@@ -45,7 +51,8 @@ class MarchingCubeHelper(IsosurfaceHelper):
         try:
             v_pos, t_pos_idx = self.mc_func(level.detach(), 0.0)
         except AttributeError:
-            print("torchmcubes was not compiled with CUDA support, use CPU version instead.")
+            print(
+                "torchmcubes was not compiled with CUDA support, use CPU version instead.")
             v_pos, t_pos_idx = self.mc_func(level.detach().cpu(), 0.0)
         v_pos = v_pos[..., [2, 1, 0]]
         v_pos = v_pos / (self.resolution - 1.0)

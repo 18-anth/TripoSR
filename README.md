@@ -21,11 +21,12 @@ Leveraging the principles of the [Large Reconstruction Model (LRM)](https://yico
     <img width="450" src="figures/scatter-comparison.png"/>
 </p>
 
-
 The model is released under the MIT license, which includes the source code, pretrained models, and an interactive online demo. Our goal is to empower researchers, developers, and creatives to push the boundaries of what's possible in 3D generative AI and 3D content creation.
 
 ## Getting Started
+
 ### Installation
+
 - Python >= 3.8
 - Install CUDA if available
 - Install PyTorch according to your platform: [https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/) **[Please make sure that the locally-installed CUDA major version matches the PyTorch-shipped CUDA major version. For example if you have CUDA 11.x installed, make sure to install PyTorch compiled with CUDA 11.x.]**
@@ -33,9 +34,11 @@ The model is released under the MIT license, which includes the source code, pre
 - Install other dependencies by `pip install -r requirements.txt`
 
 ### Manual Inference
+
 ```sh
 python run.py examples/chair.png --output-dir output/
 ```
+
 This will save the reconstructed 3D model to `output/`. You can also specify more than one image path separated by spaces. The default options takes about **6GB VRAM** for a single image input.
 
 If you would like to output a texture instead of vertex colors, use the `--bake-texture` option. You may also use `--texture-resolution` to specify the resolution in pixels of the output texture.
@@ -43,18 +46,20 @@ If you would like to output a texture instead of vertex colors, use the `--bake-
 For detailed usage of this script, use `python run.py --help`.
 
 ### Local Gradio App
+
 ```sh
 python gradio_app.py
 ```
 
 ## Troubleshooting
+
 > AttributeError: module 'torchmcubes_module' has no attribute 'mcubes_cuda'
 
 or
 
 > torchmcubes was not compiled with CUDA support, use CPU version instead.
 
-This is because `torchmcubes` is compiled without CUDA support. Please make sure that 
+This is because `torchmcubes` is compiled without CUDA support. Please make sure that
 
 - The locally-installed CUDA major version matches the PyTorch-shipped CUDA major version. For example if you have CUDA 11.x installed, make sure to install PyTorch compiled with CUDA 11.x.
 - `setuptools>=49.6.0`. If not, upgrade by `pip install --upgrade setuptools`.
@@ -67,6 +72,7 @@ pip install git+https://github.com/tatsy/torchmcubes.git
 ```
 
 ## Citation
+
 ```BibTeX
 @article{TripoSR2024,
   title={TripoSR: Fast 3D Object Reconstruction from a Single Image},
